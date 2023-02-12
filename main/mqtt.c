@@ -7,6 +7,7 @@
 #include "esp_netif.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
+#include "cJSON.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -38,12 +39,22 @@ static void log_error_if_nonzero(const char *message, int error_code)
 
 void mqtt_trata_data(char *dados)
 {
-    printf("%s\n", dados);
-    if(dados[30] == 't'){
-        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 255, 1000, LEDC_FADE_WAIT_DONE);
-    }else{
-        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0, 1000, LEDC_FADE_WAIT_DONE);
+    cJSON *json = cJSON_Parse(dados);
+    if(json == NULL){
+        return;
     }
+    char *method = cJSON_GetObjectItem(json, "method")->valuestring;
+    printf("%s\n", method);
+    if(strcmp(method, "setValue") == 0){
+        int temp = cJSON_GetObjectItem(json, "params")->valueint;
+        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, temp, 1000, LEDC_FADE_WAIT_DONE);
+    }
+
+    // if(dados[30] == 't'){
+    //     ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 255, 1000, LEDC_FADE_WAIT_DONE);
+    // }else{
+    //     ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0, 1000, LEDC_FADE_WAIT_DONE);
+    // }
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
