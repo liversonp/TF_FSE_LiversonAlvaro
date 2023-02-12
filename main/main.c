@@ -6,12 +6,19 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "freertos/semphr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "sdkconfig.h"
 
+#include "dht11.h"
 #include "wifi.h"
 #include "mqtt.h"
 
 SemaphoreHandle_t conexaoWifiSemaphore;
 SemaphoreHandle_t conexaoMQTTSemaphore;
+SemaphoreHandle_t dht11Semaphore;
+
 
 void conectadoWifi(void * params)
 {
@@ -40,9 +47,21 @@ void trataComunicacaoComServidor(void * params)
   }
 }
 
+void trataDht(void *params){
+  if(xSemaphoreTake(dht11Semaphore, portMAX_DELAY)){
+    while(true) {
+          printf("Temperature is %d \n", DHT11_read().temperature);
+          printf("Humidity is %d\n", DHT11_read().humidity);
+          printf("Status code is %d\n", DHT11_read().status);
+          vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+  }
+}
+
 void app_main(void)
 {
     // Inicializa o NVS
+    DHT11_init(GPIO_NUM_4);
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
@@ -56,4 +75,5 @@ void app_main(void)
 
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
+    xTaskCreate(&trataDht, "Leitura DHT11", 4096, NULL, 1, NULL);
 }
