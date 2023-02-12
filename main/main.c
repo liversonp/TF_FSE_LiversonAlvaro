@@ -15,6 +15,12 @@
 #include "wifi.h"
 #include "mqtt.h"
 
+// Variables
+float temperatura = 0, totalTemp = 0;
+float umidade = 0, totalUmid = 0;
+int status;
+int counter = 1;
+
 SemaphoreHandle_t conexaoWifiSemaphore;
 SemaphoreHandle_t conexaoMQTTSemaphore;
 SemaphoreHandle_t dht11Semaphore;
@@ -39,23 +45,37 @@ void trataComunicacaoComServidor(void * params)
   {
     while(true)
     {
-       float temperatura = 20.0 + (float)rand()/(float)(RAND_MAX/10.0);
-       sprintf(mensagem, "temperatura1: %f", temperatura);
-       mqtt_envia_mensagem("sensores/temperatura", mensagem);
-       vTaskDelay(3000 / portTICK_PERIOD_MS);
+      if(status == 0 && temperatura != 0 && umidade != 0){
+        sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\"}", temperatura, umidade);
+        mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+        mqtt_envia_mensagem("v1/devices/me/request/+", "{\"switch\":\"0\"}");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+      }
     }
   }
 }
 
 void trataDht(void *params){
-  if(xSemaphoreTake(dht11Semaphore, portMAX_DELAY)){
+  float temp;
+  float umid;
     while(true) {
-          printf("Temperature is %d \n", DHT11_read().temperature);
-          printf("Humidity is %d\n", DHT11_read().humidity);
-          printf("Status code is %d\n", DHT11_read().status);
-          vTaskDelay(1000 / portTICK_PERIOD_MS);
+        temp = DHT11_read().temperature;
+        status = DHT11_read().status;
+        umid = DHT11_read().humidity;
+        if(temp > 1 && umid > 1){
+          totalTemp += temp;
+          totalUmid += umid;
+          temperatura = totalTemp/counter;
+          umidade = totalUmid/counter;
+          printf("Temperature is %.2f \n", temperatura);
+          printf("Humidity is %.2f\n", umidade);
+          printf("Status code is %d\n", status);
+          vTaskDelay(10000 / portTICK_PERIOD_MS);
+          counter++;
+        }else{
+          status = -1;
+        }
     }
-  }
 }
 
 void app_main(void)
@@ -71,6 +91,8 @@ void app_main(void)
     
     conexaoWifiSemaphore = xSemaphoreCreateBinary();
     conexaoMQTTSemaphore = xSemaphoreCreateBinary();
+    dht11Semaphore = xSemaphoreCreateBinary();
+
     wifi_start();
 
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
