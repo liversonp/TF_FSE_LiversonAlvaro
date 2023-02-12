@@ -1,2 +1,2 @@
-idf_component_register(SRCS "dht11.c" "wifi.c" "mqtt.c" "main.c"
+idf_component_register(SRCS "DHT11/dht11.c" "WIFI/wifi.c" "MQTT/mqtt.c" "main.c"
                        INCLUDE_DIRS ".")
