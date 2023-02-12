@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/liversonp/Documentos/blink/build/CMakeFiles/bootloader
+/home/liversonp/Documentos/blink/build/CMakeFiles/bootloader.rule
+/home/liversonp/Documentos/blink/build/CMakeFiles/bootloader-complete.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/liversonp/Documentos/blink/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
