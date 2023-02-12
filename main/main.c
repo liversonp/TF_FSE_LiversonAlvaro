@@ -26,8 +26,10 @@ int counter = 1;
 SemaphoreHandle_t conexaoWifiSemaphore;
 SemaphoreHandle_t conexaoMQTTSemaphore;
 SemaphoreHandle_t dht11Semaphore;
+SemaphoreHandle_t KYCSemaphore;
 
 #define LED 2
+#define KYC 4
 
 void conectadoWifi(void * params)
 {
@@ -51,7 +53,6 @@ void trataComunicacaoComServidor(void * params)
       if(status == 0 && temperatura != 0 && umidade != 0){
         sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\"}", temperatura, umidade);
         mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
-        //mqtt_envia_mensagem("v1/devices/me/rpc/request/+", "{\"led\":\"led\"}");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
       }
     }
@@ -81,13 +82,27 @@ void trataDht(void *params){
     }
 }
 
+void trataKY039(void *params) {
+  float pulse = 0;
+  while(1){
+    for(int i = 0; i < 20; i++){
+      pulse += gpio_get_level(KYC);
+    }
+    printf("%.2f\n", pulse/20);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
 void app_main(void)
 {
     // Inicializa o NVS
     esp_rom_gpio_pad_select_gpio(LED);
     gpio_set_direction(LED, GPIO_MODE_OUTPUT);
 
-    DHT11_init(GPIO_NUM_4);
+    esp_rom_gpio_pad_select_gpio(KYC);
+    gpio_set_direction(KYC, GPIO_MODE_INPUT);
+
+    DHT11_init(GPIO_NUM_16);
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
@@ -98,10 +113,12 @@ void app_main(void)
     conexaoWifiSemaphore = xSemaphoreCreateBinary();
     conexaoMQTTSemaphore = xSemaphoreCreateBinary();
     dht11Semaphore = xSemaphoreCreateBinary();
+    KYCSemaphore = xSemaphoreCreateBinary();
 
     wifi_start();
 
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
     xTaskCreate(&trataDht, "Leitura DHT11", 4096, NULL, 1, NULL);
+    xTaskCreate(&trataKY039, "Leitura KYC", 4096, NULL, 1, NULL);
 }

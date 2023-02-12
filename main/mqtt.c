@@ -29,6 +29,9 @@
 extern SemaphoreHandle_t conexaoMQTTSemaphore;
 esp_mqtt_client_handle_t client;
 
+
+int ledPower = 0;
+
 static void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0) {
@@ -43,18 +46,13 @@ void mqtt_trata_data(char *dados)
     if(json == NULL){
         return;
     }
+    
+    //Controle PWM
     char *method = cJSON_GetObjectItem(json, "method")->valuestring;
-    printf("%s\n", method);
     if(strcmp(method, "setValue") == 0){
-        int temp = cJSON_GetObjectItem(json, "params")->valueint;
-        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, temp, 1000, LEDC_FADE_WAIT_DONE);
+        ledPower = cJSON_GetObjectItem(json, "params")->valueint;
+        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, ledPower, 1000, LEDC_FADE_WAIT_DONE);
     }
-
-    // if(dados[30] == 't'){
-    //     ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 255, 1000, LEDC_FADE_WAIT_DONE);
-    // }else{
-    //     ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0, 1000, LEDC_FADE_WAIT_DONE);
-    // }
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
