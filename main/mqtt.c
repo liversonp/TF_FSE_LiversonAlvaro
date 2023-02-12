@@ -5,6 +5,8 @@
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "driver/gpio.h"
+#include "driver/ledc.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -14,6 +16,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+
 
 #include "esp_log.h"
 #include "mqtt_client.h"
@@ -32,6 +35,17 @@ static void log_error_if_nonzero(const char *message, int error_code)
     }
 }
 
+
+void mqtt_trata_data(char *dados)
+{
+    printf("%s\n", dados);
+    if(dados[30] == 't'){
+        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 255, 1000, LEDC_FADE_WAIT_DONE);
+    }else{
+        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0, 1000, LEDC_FADE_WAIT_DONE);
+    }
+}
+
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, (int) event_id);
@@ -42,7 +56,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
         xSemaphoreGive(conexaoMQTTSemaphore);
-        msg_id = esp_mqtt_client_subscribe(client, "dispositivos/#", 0);
+        msg_id = esp_mqtt_client_subscribe(client, "v1/devices/me/rpc/request/+", 0);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -61,8 +75,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DATA:
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-        printf("DATA=%.*s\r\n", event->data_len, event->data);
+        mqtt_trata_data(event->data);
         break;
     case MQTT_EVENT_ERROR:
         ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -82,6 +95,29 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void mqtt_start()
 {
+
+    // Configuração do Timer
+    ledc_timer_config_t timer_config = {
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .duty_resolution = LEDC_TIMER_8_BIT,
+      .timer_num = LEDC_TIMER_0,
+      .freq_hz = 1000,
+      .clk_cfg = LEDC_AUTO_CLK
+    };
+    ledc_timer_config(&timer_config);
+
+    // Configuração do Canal
+    ledc_channel_config_t channel_config = {
+      .gpio_num = 2,
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .channel = LEDC_CHANNEL_0,
+      .timer_sel = LEDC_TIMER_0,
+      .duty = 0,
+      .hpoint = 0
+    };
+    ledc_channel_config(&channel_config);
+    ledc_fade_func_install(0);
+
     esp_mqtt_client_config_t mqtt_config = {
         .broker.address.uri = "mqtt://164.41.98.25",
         .credentials.username = "URCKOI804Vu97EoeUebr",
@@ -98,5 +134,4 @@ void mqtt_envia_mensagem(char * topico, char * mensagem)
 {
     int message_id = esp_mqtt_client_publish(client, topico, mensagem, 0, 1, 0);
     ESP_LOGI(TAG, "Mensagem enviada, ID: %d", message_id);
-    printf("%s\n", mensagem);
 }
