@@ -23,16 +23,16 @@
 // Variables
 float temperatura = 0, totalTemp = 0;
 float umidade = 0, totalUmid = 0;
-int status;
+int status, miniReed = 1;
 int counter = 1;
 
 SemaphoreHandle_t conexaoWifiSemaphore;
 SemaphoreHandle_t conexaoMQTTSemaphore;
 SemaphoreHandle_t dht11Semaphore;
-SemaphoreHandle_t KYCSemaphore;
+SemaphoreHandle_t REEDSemaphore;
 
 #define LED 2
-#define KYC ADC_CHANNEL_0
+#define M_REED 4
 
 void conectadoWifi(void * params)
 {
@@ -48,13 +48,13 @@ void conectadoWifi(void * params)
 
 void trataComunicacaoComServidor(void * params)
 {
-  char mensagem[50];
+  char mensagem[100];
   if(xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY))
   {
     while(true)
     {
       if(status == 0 && temperatura != 0 && umidade != 0){
-        sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\"}", temperatura, umidade);
+        sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\", \"reed\":\"%d\"}", temperatura, umidade, miniReed);
         mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
       }
@@ -85,12 +85,10 @@ void trataDht(void *params){
     }
 }
 
-void trataKY039(void *params) {
-  float pulse = 0;
+void trataM_REED(void *params) {
   while(1){
-    pulse = analogRead(KYC);
-    printf("pulse: %.2f\n", pulse);
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    miniReed = !digitalRead(M_REED);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
 
@@ -99,13 +97,11 @@ void app_main(void)
     // Iniciar LED
     esp_rom_gpio_pad_select_gpio(LED);
     gpio_set_direction(LED, GPIO_MODE_OUTPUT);
+    esp_rom_gpio_pad_select_gpio(M_REED);
+    gpio_set_direction(LED, GPIO_MODE_INPUT);
 
     // Iniciar DHT11
     DHT11_init(GPIO_NUM_16);
-    
-    //Iniciar Entrada Analog
-    adc_init(ADC_UNIT_1);
-    pinMode(KYC, GPIO_ANALOG);
 
     // Inicializa o NVS
     esp_err_t ret = nvs_flash_init();
@@ -119,7 +115,7 @@ void app_main(void)
     conexaoWifiSemaphore = xSemaphoreCreateBinary();
     conexaoMQTTSemaphore = xSemaphoreCreateBinary();
     dht11Semaphore = xSemaphoreCreateBinary();
-    KYCSemaphore = xSemaphoreCreateBinary();
+    REEDSemaphore = xSemaphoreCreateBinary();
 
     wifi_start();
 
@@ -127,5 +123,5 @@ void app_main(void)
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
     xTaskCreate(&trataDht, "Leitura DHT11", 4096, NULL, 1, NULL);
-    xTaskCreate(&trataKY039, "Leitura KYC", 4096, NULL, 1, NULL);
+    xTaskCreate(&trataM_REED, "Leitura KYC", 4096, NULL, 1, NULL);
 }
