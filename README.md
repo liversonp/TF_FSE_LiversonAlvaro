@@ -33,6 +33,21 @@ No caso do Álvaro ele precisou utilizar o script do seguinte repositório para 
 
 Isso se deu porque ele utiliza o WSL.
 
+Para execução sem utilização de extensões do VSCode é necessário possuir a instalação local da espressif e executar os seguintes comandos:
+* idf.py build (para construir o código)
+* idf.py flash -p <PORT> (para subir o código para a sua placa)
 
 ## Thingsboard e sensores
+O Projeto foi executado utilizando a Dashboard localizada no link: http://164.41.98.25:443/dashboards/0beea240-aae3-11ed-8436-09bf763c9306
+Os sensores utilizados foram:
+* DHT11 - Para temperatura e umidade do ar
+* Mini Reed - Para reconhecer presença de imã
 
+Além do Led presente na placa por meio de controle PWM via dimmer.
+
+### Vídeo
+O vídeo de apresentação dos sensores na ThingsBoard está dispónível aqui:
+[Video de Explicação](https://youtu.be/63ZMA1ipVv8)
+
+### Imagens
+![ESP32+Dashboard](img/Dash.png)
