@@ -17,8 +17,8 @@
 #include "DHT11/dht11.h"
 #include "WIFI/wifi.h"
 #include "MQTT/mqtt.h"
-#include "ADC/adc.h"
 #include "GPIO/gpio_setup.h"
+#include "NVS/treatnvs.h"
 
 // Variables
 float temperatura = 0, totalTemp = 0;
@@ -46,15 +46,41 @@ void conectadoWifi(void * params)
   }
 }
 
+void initGPIO(){
+    // Configuração do Timer
+    ledc_timer_config_t timer_config = {
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .duty_resolution = LEDC_TIMER_8_BIT,
+      .timer_num = LEDC_TIMER_0,
+      .freq_hz = 1000,
+      .clk_cfg = LEDC_AUTO_CLK
+    };
+    ledc_timer_config(&timer_config);
+
+    // Configuração do Canal
+    ledc_channel_config_t channel_config = {
+      .gpio_num = 2,
+      .speed_mode = LEDC_LOW_SPEED_MODE,
+      .channel = LEDC_CHANNEL_0,
+      .timer_sel = LEDC_TIMER_0,
+      .duty = 0,
+      .hpoint = 0
+    };
+    ledc_channel_config(&channel_config);
+    ledc_fade_func_install(0);
+}
+
 void trataComunicacaoComServidor(void * params)
 {
   char mensagem[100];
   if(xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY))
   {
+    int ledPower;
     while(true)
     {
       if(status == 0 && temperatura != 0 && umidade != 0){
-        sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\", \"reed\":\"%d\"}", temperatura, umidade, miniReed);
+        ledPower = nvsGetValue("led");
+        sprintf(mensagem, "{ \"temperatura\": \"%.2f\", \"umidade\": \"%.2f\", \"reed\":\"%d\", \"led\": \"%d\" }", temperatura, umidade, miniReed, ledPower);
         mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
       }
@@ -94,22 +120,24 @@ void trataM_REED(void *params) {
 
 void app_main(void)
 {
-    // Iniciar LED
+    // Iniciar LED & Mini Reed
     esp_rom_gpio_pad_select_gpio(LED);
     gpio_set_direction(LED, GPIO_MODE_OUTPUT);
+
     esp_rom_gpio_pad_select_gpio(M_REED);
     gpio_set_direction(LED, GPIO_MODE_INPUT);
 
     // Iniciar DHT11
     DHT11_init(GPIO_NUM_16);
 
-    // Inicializa o NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+    //Inicia NVS
+    nvsInit();
+    
+    //Definir LED no Ultimo valor antes da placa desligar
+    initGPIO();
+    int ledPower = nvsGetValue("led");
+    printf("%d\n", ledPower);
+    ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, ledPower, 1000, LEDC_FADE_WAIT_DONE);
     
     // Semaforos
     conexaoWifiSemaphore = xSemaphoreCreateBinary();

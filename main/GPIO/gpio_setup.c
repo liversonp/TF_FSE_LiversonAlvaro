@@ -5,7 +5,6 @@
 #include "esp_log.h"
 
 #include "gpio_setup.h"
-#include "./ADC/adc.h"
 
 const static char *TAG = "GPIO_SETUP";
 
@@ -44,9 +43,6 @@ void pinMode(gpio_num_t pin, int mode){
         io_conf.pull_down_en = 1;
         io_conf.pull_up_en = 0;
         gpio_config(&io_conf);
-        break;
-    case GPIO_ANALOG:
-        adc_config_pin(pin);
         break;
     default:
         ESP_LOGW(TAG, "Unable to configure pin %d", pin);

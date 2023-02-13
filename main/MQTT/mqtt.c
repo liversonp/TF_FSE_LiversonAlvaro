@@ -7,7 +7,7 @@
 #include "esp_netif.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
-#include "cJSON.h"
+#include "./cJSON/cJSON.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -23,6 +23,7 @@
 #include "mqtt_client.h"
 
 #include "mqtt.h"
+#include "./NVS/treatnvs.h"
 
 #define TAG "MQTT"
 
@@ -39,7 +40,6 @@ static void log_error_if_nonzero(const char *message, int error_code)
     }
 }
 
-
 void mqtt_trata_data(char *dados)
 {
     cJSON *json = cJSON_Parse(dados);
@@ -52,6 +52,7 @@ void mqtt_trata_data(char *dados)
     if(strcmp(method, "setValue") == 0){
         ledPower = cJSON_GetObjectItem(json, "params")->valueint;
         ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, ledPower, 1000, LEDC_FADE_WAIT_DONE);
+        nvsWriteValue("led", ledPower);
     }
 }
 
@@ -104,29 +105,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void mqtt_start()
 {
-
-    // Configuração do Timer
-    ledc_timer_config_t timer_config = {
-      .speed_mode = LEDC_LOW_SPEED_MODE,
-      .duty_resolution = LEDC_TIMER_8_BIT,
-      .timer_num = LEDC_TIMER_0,
-      .freq_hz = 1000,
-      .clk_cfg = LEDC_AUTO_CLK
-    };
-    ledc_timer_config(&timer_config);
-
-    // Configuração do Canal
-    ledc_channel_config_t channel_config = {
-      .gpio_num = 2,
-      .speed_mode = LEDC_LOW_SPEED_MODE,
-      .channel = LEDC_CHANNEL_0,
-      .timer_sel = LEDC_TIMER_0,
-      .duty = 0,
-      .hpoint = 0
-    };
-    ledc_channel_config(&channel_config);
-    ledc_fade_func_install(0);
-
     esp_mqtt_client_config_t mqtt_config = {
         .broker.address.uri = "mqtt://164.41.98.25",
         .credentials.username = "URCKOI804Vu97EoeUebr",
@@ -135,9 +113,6 @@ void mqtt_start()
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 }
-
-
-
 
 void mqtt_envia_mensagem(char * topico, char * mensagem)
 {
