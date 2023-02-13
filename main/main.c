@@ -12,10 +12,13 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "sdkconfig.h"
+#include "esp_adc/adc_oneshot.h"
 
-#include "dht11.h"
-#include "wifi.h"
-#include "mqtt.h"
+#include "DHT11/dht11.h"
+#include "WIFI/wifi.h"
+#include "MQTT/mqtt.h"
+#include "ADC/adc.h"
+#include "GPIO/gpio_setup.h"
 
 // Variables
 float temperatura = 0, totalTemp = 0;
@@ -29,7 +32,7 @@ SemaphoreHandle_t dht11Semaphore;
 SemaphoreHandle_t KYCSemaphore;
 
 #define LED 2
-#define KYC 4
+#define KYC ADC_CHANNEL_0
 
 void conectadoWifi(void * params)
 {
@@ -85,24 +88,26 @@ void trataDht(void *params){
 void trataKY039(void *params) {
   float pulse = 0;
   while(1){
-    for(int i = 0; i < 20; i++){
-      pulse += gpio_get_level(KYC);
-    }
-    printf("%.2f\n", pulse/20);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    pulse = analogRead(KYC);
+    printf("pulse: %.2f\n", pulse);
+    vTaskDelay(10000 / portTICK_PERIOD_MS);
   }
 }
 
 void app_main(void)
 {
-    // Inicializa o NVS
+    // Iniciar LED
     esp_rom_gpio_pad_select_gpio(LED);
     gpio_set_direction(LED, GPIO_MODE_OUTPUT);
 
-    esp_rom_gpio_pad_select_gpio(KYC);
-    gpio_set_direction(KYC, GPIO_MODE_INPUT);
-
+    // Iniciar DHT11
     DHT11_init(GPIO_NUM_16);
+    
+    //Iniciar Entrada Analog
+    adc_init(ADC_UNIT_1);
+    pinMode(KYC, GPIO_ANALOG);
+
+    // Inicializa o NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
@@ -110,6 +115,7 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
     
+    // Semaforos
     conexaoWifiSemaphore = xSemaphoreCreateBinary();
     conexaoMQTTSemaphore = xSemaphoreCreateBinary();
     dht11Semaphore = xSemaphoreCreateBinary();
@@ -117,6 +123,7 @@ void app_main(void)
 
     wifi_start();
 
+    // Tasks
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
     xTaskCreate(&trataDht, "Leitura DHT11", 4096, NULL, 1, NULL);
